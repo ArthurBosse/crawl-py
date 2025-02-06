@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Activity, Globe, CheckCircle, XCircle } from 'lucide-react';
+import { Activity, Globe, CheckCircle, XCircle, Play, Loader } from 'lucide-react';
 
 // Initialisation de Supabase
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -12,6 +12,7 @@ interface Project {
   name: string;
   start_url: string;
   created_at: string;
+  status?: 'idle' | 'running';
 }
 
 interface CrawledPage {
@@ -33,6 +34,7 @@ function App() {
   const [checkedDomains, setCheckedDomains] = useState<CheckedDomain[]>([]);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectUrl, setNewProjectUrl] = useState('');
+  const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     fetchProjects();
@@ -93,6 +95,37 @@ function App() {
     }
   };
 
+  const startCrawler = async (projectId: string, startUrl: string) => {
+    setLoading(prev => ({ ...prev, [projectId]: true }));
+    try {
+      const response = await fetch('/api/start-crawler', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId,
+          startUrl,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors du démarrage du crawler');
+      }
+      
+      // Mettre à jour le statut du projet
+      const updatedProjects = projects.map(p => 
+        p.id === projectId ? { ...p, status: 'running' } : p
+      );
+      setProjects(updatedProjects);
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert('Erreur lors du démarrage du crawler');
+    } finally {
+      setLoading(prev => ({ ...prev, [projectId]: false }));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-lg">
@@ -142,21 +175,48 @@ function App() {
             <h2 className="text-lg font-semibold mb-4">Projets</h2>
             <div className="grid grid-cols-1 gap-4">
               {projects.map((project) => (
-                <button
+                <div
                   key={project.id}
-                  onClick={() => setSelectedProject(project.id)}
                   className={`p-4 rounded-lg border ${
                     selectedProject === project.id
                       ? 'border-indigo-600 bg-indigo-50'
-                      : 'border-gray-200 hover:border-indigo-300'
+                      : 'border-gray-200'
                   }`}
                 >
-                  <div className="flex items-center">
-                    <Globe className="h-5 w-5 text-indigo-600 mr-2" />
-                    <span className="font-medium">{project.name}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Globe className="h-5 w-5 text-indigo-600 mr-2" />
+                      <div>
+                        <span className="font-medium">{project.name}</span>
+                        <div className="text-sm text-gray-500">{project.start_url}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSelectedProject(project.id)}
+                        className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+                      >
+                        Détails
+                      </button>
+                      <button
+                        onClick={() => startCrawler(project.id, project.start_url)}
+                        disabled={loading[project.id] || project.status === 'running'}
+                        className={`flex items-center px-3 py-1 text-sm rounded ${
+                          loading[project.id] || project.status === 'running'
+                            ? 'bg-gray-300 cursor-not-allowed'
+                            : 'bg-green-500 hover:bg-green-600 text-white'
+                        }`}
+                      >
+                        {loading[project.id] ? (
+                          <Loader className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <Play className="h-4 w-4 mr-1" />
+                        )}
+                        {project.status === 'running' ? 'En cours' : 'Démarrer'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">{project.start_url}</div>
-                </button>
+                </div>
               ))}
             </div>
           </div>
