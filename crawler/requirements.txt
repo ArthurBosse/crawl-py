@@ -1,0 +1,6 @@
+scrapy==2.11.0
+python-dotenv==1.0.0
+supabase==2.3.5
+dnspython==2.6.1
+requests==2.31.0
+asyncio==3.4.3
